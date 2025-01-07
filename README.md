@@ -16,6 +16,7 @@ To build and run the project, ensure that you have the following tools and softw
   
 - **GTKWave**: A waveform viewer used to visualize simulation outputs, such as VCD files.
   - Install GTKWave with the following command (for Ubuntu-based systems):
+    
     ```bash
     sudo apt-get install gtkwave
     ```
