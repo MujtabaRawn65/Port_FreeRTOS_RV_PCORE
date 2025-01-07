@@ -1,0 +1,3 @@
+[submodule "UETRV-PCore"]
+    path = UETRV-PCore
+    url = https://github.com/ee-uet/UETRV-PCore.git
