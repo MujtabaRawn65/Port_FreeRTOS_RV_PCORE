@@ -113,7 +113,7 @@ Follow the steps below to build the **GNU RISC-V Toolchain** using Crosstool-NG:
       ```
    ---
 
-## **Running FreeRTOS on RISC-V Core**
+## **Running FreeRTOS Demo on RISC-V Core**
 
 Once the binary is generated, follow these steps to run the project on UETRV-Pcore:
 
