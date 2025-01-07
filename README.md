@@ -100,11 +100,9 @@ Follow the steps below to build the **GNU RISC-V Toolchain** using Crosstool-NG:
    make DEBUG=1
    make XLEN=64
    ```
-
-3. **Resulting Executable**:
    The resulting executable file will be located at `./build/RTOSDemo.axf`.
    
-4. **Converting `.afx` to `.hex`**:
+3. **Converting `.afx` to `.hex`**:
 
     After building the project, you can convert the `.afx` binary file to a `.hex` file for further use:
    
