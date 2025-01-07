@@ -156,6 +156,9 @@ After running the simulation, the output will be available in the `uartlog` file
 
 For a successful demo, you should expect output similar to the following in the `uartlog`:
 
+<p align="center">
+  <img src="output/out.png" alt="Log file Output" width="600"/>
+</p>
 ---
 
 ## **Notes for Modifications**
