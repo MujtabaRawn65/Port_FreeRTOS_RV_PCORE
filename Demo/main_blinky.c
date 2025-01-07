@@ -28,129 +28,133 @@
 #include <FreeRTOS.h>
 #include <task.h>
 #include <queue.h>
-
+#include <timers.h>
 #include <stdio.h>
-
 #include "riscv-virt.h"
-// #include "ns16550.h"
 
 /* Priorities used by the tasks. */
-#define mainQUEUE_RECEIVE_TASK_PRIORITY    ( tskIDLE_PRIORITY + 2 )
-#define mainQUEUE_SEND_TASK_PRIORITY       ( tskIDLE_PRIORITY + 1 )
+#define mainQUEUE_RECEIVE_TASK_PRIORITY    ( tskIDLE_PRIORITY + 3 )
+#define mainQUEUE_SEND_TASK_PRIORITY       ( tskIDLE_PRIORITY + 2 )
+#define mainTIMER_TASK_PRIORITY            ( tskIDLE_PRIORITY + 4 )
+#define mainTIME_SLICING_TASK_PRIORITY     ( tskIDLE_PRIORITY + 4 )
+#define mainPRINT_HELLO_TASK_PRIORITY      ( tskIDLE_PRIORITY + 1 )
 
-/* The rate at which data is sent to the queue.  The 200ms value is converted
- * to ticks using the pdMS_TO_TICKS() macro. */
+/* The rate at which data is sent to the queue. */
 #define mainQUEUE_SEND_FREQUENCY_MS        pdMS_TO_TICKS( 1000 )
+#define mainTIMER_PRINT_FREQUENCY_MS       pdMS_TO_TICKS( 2000 )
+#define mainHELLO_PRINT_FREQUENCY_MS       pdMS_TO_TICKS( 5000 )  // Increased time for Hello task
 
-/* The maximum number items the queue can hold.  The priority of the receiving
- * task is above the priority of the sending task, so the receiving task will
- * preempt the sending task and remove the queue items each time the sending task
- * writes to the queue.  Therefore the queue will never have more than one item in
- * it at any time, and even with a queue length of 1, the sending task will never
- * find the queue full. */
+/* The maximum number of items the queue can hold. */
 #define mainQUEUE_LENGTH                   ( 1 )
-
-/*-----------------------------------------------------------*/
 
 /* The queue used by both tasks. */
 static QueueHandle_t xQueue = NULL;
 
-/*-----------------------------------------------------------*/
-
 static void prvQueueSendTask( void * pvParameters )
 {
     TickType_t xNextWakeTime;
-    const unsigned long ulValueToSend = 100UL;
-    const char * const pcMessage1 = "Transfer1";
-    const char * const pcMessage2 = "Transfer2";
-    int f = 1;
+    unsigned long ulValueToSend = 0UL;
 
-    /* Remove compiler warning about unused parameter. */
     ( void ) pvParameters;
 
-    /* Initialise xNextWakeTime - this only needs to be done once. */
     xNextWakeTime = xTaskGetTickCount();
 
     for( ; ; )
     {
-        char buf[ 40 ];
-
-        sprintf( buf, "%d: %s: %s", xGetCoreID(),
-                 pcTaskGetName( xTaskGetCurrentTaskHandle() ),
-                 ( f ) ? pcMessage1 : pcMessage2 );
-        vSendString( buf );
-        f = !f;
-
-        /* Place this task in the blocked state until it is time to run again. */
         vTaskDelayUntil( &xNextWakeTime, mainQUEUE_SEND_FREQUENCY_MS );
 
-        /* Send to the queue - causing the queue receive task to unblock and
-         * toggle the LED.  0 is used as the block time so the sending operation
-         * will not block - it shouldn't need to block as the queue should always
-         * be empty at this point in the code. */
+        ulValueToSend++;
+        char buf[ 40 ];
+        sprintf( buf, "%d: %s: send %ld", xGetCoreID(),
+                 pcTaskGetName( xTaskGetCurrentTaskHandle() ),
+                 ulValueToSend );
+        vSendString( buf );
+
         xQueueSend( xQueue, &ulValueToSend, 0U );
     }
 }
 
-/*-----------------------------------------------------------*/
-
 static void prvQueueReceiveTask( void * pvParameters )
 {
-    unsigned long ulReceivedValue;
-    const unsigned long ulExpectedValue = 100UL;
-    const char * const pcMessage1 = "Blink1";
-    const char * const pcMessage2 = "Blink2";
-    const char * const pcFailMessage = "Unexpected value received\r\n";
-    int f = 1;
-
-    /* Remove compiler warning about unused parameter. */
     ( void ) pvParameters;
 
     for( ; ; )
     {
-        char buf[ 40 ];
-
-        /* Wait until something arrives in the queue - this task will block
-         * indefinitely provided INCLUDE_vTaskSuspend is set to 1 in
-         * FreeRTOSConfig.h. */
+        unsigned long ulReceivedValue;
         xQueueReceive( xQueue, &ulReceivedValue, portMAX_DELAY );
 
-        /*  To get here something must have been received from the queue, but
-         * is it the expected value?  If it is, toggle the LED. */
-        if( ulReceivedValue == ulExpectedValue )
-        {
-            sprintf( buf, "%d: %s: %s", xGetCoreID(),
-                     pcTaskGetName( xTaskGetCurrentTaskHandle() ),
-                     ( f ) ? pcMessage1 : pcMessage2 );
-            vSendString( buf );
-            f = !f;
-
-            ulReceivedValue = 0U;
-        }
-        else
-        {
-            vSendString( pcFailMessage );
-        }
+        char buf[ 40 ];
+        sprintf( buf, "%d: %s: received %ld", xGetCoreID(),
+                 pcTaskGetName( xTaskGetCurrentTaskHandle() ),
+                 ulReceivedValue );
+        vSendString( buf );
     }
 }
 
-/*-----------------------------------------------------------*/
+static void prvPrintHelloTask( void * pvParameters )
+{
+    ( void ) pvParameters;
+
+    for( ; ; )
+    {
+        vSendString( "Hello FreeRTOS!" );
+        vTaskDelay(mainHELLO_PRINT_FREQUENCY_MS);  // Delay for 5 seconds
+    }
+}
+
+static void prvTimerTask( void * pvParameters )
+{
+    TickType_t xNextWakeTime;
+    static unsigned long ulTimerCount = 0;  // Timer counter to change each time
+
+    ( void ) pvParameters;
+
+    xNextWakeTime = xTaskGetTickCount();
+
+    for( ; ; )
+    {
+        vTaskDelayUntil( &xNextWakeTime, mainTIMER_PRINT_FREQUENCY_MS );
+        
+        ulTimerCount++;  // Increment the timer count each time it runs
+        char buf[50];  // Buffer to store the message
+        sprintf(buf, "Timer running after 2 seconds: Count %lu", ulTimerCount);
+        vSendString(buf);  // Print the timer count each time
+    }
+}
+
+
+static void prvTimeSlicingTask( void * pvParameters )
+{
+    ( void ) pvParameters;
+
+    for( ; ; )
+    {
+        vSendString( "Time-slicing task is executing..." );
+        taskYIELD();
+        vTaskDelay(mainTIMER_PRINT_FREQUENCY_MS);  // Delay to make time slicing visible
+    }
+}
 
 int main_blinky( void )
 {
-    vSendString( "Hello FreeRTOS!" );
+    vSendString( "Starting FreeRTOS Scheduler" );
 
     /* Create the queue. */
-    xQueue = xQueueCreate( mainQUEUE_LENGTH, sizeof( uint32_t ) );
+    xQueue = xQueueCreate( mainQUEUE_LENGTH, sizeof( unsigned long ) );
 
     if( xQueue != NULL )
     {
-        /* Start the two tasks as described in the comments at the top of this
-         * file. */
+        /* Start the tasks. */
         xTaskCreate( prvQueueReceiveTask, "Rx", configMINIMAL_STACK_SIZE * 2U, NULL,
                      mainQUEUE_RECEIVE_TASK_PRIORITY, NULL );
         xTaskCreate( prvQueueSendTask, "Tx", configMINIMAL_STACK_SIZE * 2U, NULL,
                      mainQUEUE_SEND_TASK_PRIORITY, NULL );
+        xTaskCreate( prvPrintHelloTask, "Hello", configMINIMAL_STACK_SIZE * 2U, NULL,
+                     mainPRINT_HELLO_TASK_PRIORITY, NULL );
+        xTaskCreate( prvTimerTask, "Timer", configMINIMAL_STACK_SIZE * 2U, NULL,
+                     mainTIMER_TASK_PRIORITY, NULL );
+        xTaskCreate( prvTimeSlicingTask, "TimeSlicing", configMINIMAL_STACK_SIZE * 2U, NULL,
+                     mainTIME_SLICING_TASK_PRIORITY, NULL );
     }
 
     vTaskStartScheduler();
