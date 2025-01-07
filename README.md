@@ -2,82 +2,121 @@
 
 ## **Objective**
 
-The **Port_FreeRTOS_RV_PCORE** project aims to provide a working setup of the FreeRTOS operating system on RISC-V cores, leveraging the power of FreeRTOS for real-time tasks and demonstrating efficient execution on RISC-V hardware using a simple UART communication example.
-
+The Port_FreeRTOS_RV_PCORE project aims to provide a working setup of the FreeRTOS operating system on RISC-V cores, demonstrated on the UET RV PCORE platform. It leverages the power of FreeRTOS for real-time tasks and demonstrates efficient execution on RISC-V hardware through a simple UART communication example.
 ---
 
 ## **Prerequisites**
 
 To build and run the project, ensure that you have the following tools and software installed:
 
-- **RISC-V Toolchain**: The project requires the **RISC-V cross-toolchain** to compile the code for RISC-V architecture. Instructions for installation are included below.
-- **Make**: A build system for automating the compilation process.
-- **Simulation/Emulation Tools**: Required for running the project on simulators, specifically **sim-verilate**.
-
+- **GNU RISC-V Toolchain** (tested on Crosstool-NG)
+- **Verilator**: A tool for compiling Verilog code into C++ models, used for simulation.
+  - To install Verilator, follow the instructions from [Verilator Installation Guide](https://verilator.org/).
+  
+- **GTKWave**: A waveform viewer used to visualize simulation outputs, such as VCD files.
+  - Install GTKWave with the following command (for Ubuntu-based systems):
+    ```bash
+    sudo apt-get install gtkwave
+    ```
 ---
 
-## **Installation of RISC-V Toolchain**
+## **How to Build Toolchain**
 
-Follow the steps below to install the **RISC-V cross-toolchain** on your system:
+Follow the steps below to build the **GNU RISC-V Toolchain** using Crosstool-NG:
 
-1. **Clone the RISC-V toolchain repository**:
+1. **Clone the Crosstool-NG repository**:
    ```bash
-   git clone https://github.com/riscv/riscv-gnu-toolchain.git
-   cd riscv-gnu-toolchain
+   git clone https://github.com/crosstool-ng/crosstool-ng
+   cd crosstool-ng
    ```
 
-2. **Install required dependencies** (for Ubuntu-based systems):
+2. **Bootstrap and configure Crosstool-NG**:
    ```bash
-   sudo apt-get install autoconf automake bison flex gawk build-essential libgmp3-dev libmpc-dev libmpfr-dev libisl-dev
-   ```
-
-3. **Build the toolchain**:
-   ```bash
-   ./configure --prefix=/path/to/install/directory
+   ./bootstrap
+   ./configure --enable-local
    make
    ```
 
-4. **Update environment variables**:
-   ```bash
-   export PATH=$PATH:/path/to/install/directory/bin
+3. **Generate Toolchain Configuration**:
+   Create a `defconfig` file (exactly the same name, with no file extension) with the following content based on your build architecture:
+
+   **For RV32 builds**:
+   ```text
+   CT_EXPERIMENTAL=y
+   CT_ARCH_RISCV=y
+   CT_ARCH_64=n
+   CT_ARCH_ARCH="rv32ima"
+   CT_ARCH_ABI="ilp32"
+   CT_TARGET_CFLAGS="-mcmodel=medany"
+   CT_TARGET_LDFLAGS="-mcmodel=medany"
+   CT_MULTILIB=y
+   CT_DEBUG_GDB=y
    ```
+
+   **For RV64 builds**:
+   ```text
+   CT_EXPERIMENTAL=y
+   CT_ARCH_RISCV=y
+   CT_ARCH_64=y
+   CT_ARCH_ARCH="rv64ima"
+   CT_ARCH_ABI="lp64"
+   CT_TARGET_CFLAGS="-mcmodel=medany"
+   CT_TARGET_LDFLAGS="-mcmodel=medany"
+   CT_MULTILIB=y
+   CT_DEBUG_GDB=y
+   ```
+
+4. **Run the command to save configurations**:
+   ```bash
+   ./ct-ng defconfig
+   ```
+
+5. **Build the GNU Toolchain**:
+   ```bash
+   ./ct-ng build
+   ```
+
+   This will install the toolchain to `~/x-tools/riscv32-unknown-elf` or `~/x-tools/riscv64-unknown-elf` depending on your build.
 
 ---
 
-## **Building and Running the Project**
+## **Building the Project**
 
-Once the prerequisites are installed, follow these steps to compile and run the project:
-
-1. **Clone the project repository**:
+1. **Add the path to your RISC-V toolchain**:
    ```bash
-   git clone https://your_project_repository_url.git
-   cd Port_FreeRTOS_RV_PCORE
+   export PATH=~/x-tools/{YOUR_TOOLCHAIN}/bin:$PATH
    ```
 
 2. **Build the project using `make`**:
+   Simply run:
    ```bash
    make
    ```
 
-3. **Output**: The output will be a binary `.afx` file, which contains the compiled application for the RISC-V core.
-
----
-
-## **Converting `.afx` to `.hex`**
-
-After building the project, you can convert the `.afx` binary file to a `.hex` file for further use:
-
-1. **Convert** `.afx` to `.hex`:
+   If you want to build in debug mode, pass `DEBUG=1`. For an RV64 build, use `XLEN=64`:
    ```bash
-   riscv32-unknown-elf-objcopy -O ihex build/main.afx build/main.hex
+   make DEBUG=1
+   make XLEN=64
    ```
 
-2. **Rename** the `.hex` file to `hello.hex`:
-   ```bash
-   mv build/main.hex hello.hex
-   ```
+3. **Resulting Executable**:
+   The resulting executable file will be located at `./build/RTOSDemo32.axf` or `./build/RTOSDemo64.axf`, depending on the architecture.
+   
+4. **Converting `.afx` to `.hex`**:
 
-3. **Copy** the `hello.hex` file to the required directory:
+    After building the project, you can convert the `.afx` binary file to a `.hex` file for further use:
+   
+      ```bash
+      riscv32-unknown-elf-objcopy -O ihex build/main.afx build/main.hex
+      ```
+   ---
+
+## **Running FreeRTOS on RISC-V Core**
+
+Once the binary is generated, follow these steps to run the project:
+
+
+ **Copy** the `hello.hex` file to the required directory:
    ```bash
    cp hello.hex /path/to/uetrvpcore/sdk/example-uart/src/
    ```
