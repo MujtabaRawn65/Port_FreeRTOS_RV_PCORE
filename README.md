@@ -2,7 +2,8 @@
 
 ## **Objective**
 
-The Port_FreeRTOS_RV_PCORE project aims to provide a working setup of the FreeRTOS operating system on RISC-V cores, demonstrated on the UET RV PCORE platform. It leverages the power of FreeRTOS for real-time tasks and demonstrates efficient execution on RISC-V hardware through a simple UART communication example.
+The Port_FreeRTOS_RV_PCORE project is designed to set up and run the FreeRTOS operating system on RISC-V cores, specifically demonstrated on the UET RV PCORE platform. The project showcases the capability of FreeRTOS in managing real-time tasks on RISC-V architecture, highlighting the efficiency of the system through a simple UART communication example.
+
 ---
 
 ## **Prerequisites**
@@ -100,26 +101,26 @@ Follow the steps below to build the **GNU RISC-V Toolchain** using Crosstool-NG:
    ```
 
 3. **Resulting Executable**:
-   The resulting executable file will be located at `./build/RTOSDemo32.axf` or `./build/RTOSDemo64.axf`, depending on the architecture.
+   The resulting executable file will be located at `./build/RTOSDemo.axf`.
    
 4. **Converting `.afx` to `.hex`**:
 
     After building the project, you can convert the `.afx` binary file to a `.hex` file for further use:
    
       ```bash
-      riscv32-unknown-elf-objcopy -O ihex build/main.afx build/main.hex
+      riscv32-unknown-elf-objcopy -O binary RTOSDemo.axf RTOSDemo.bin
+      hexdump -ve '1/4 "%08x\n"' RTOSDemo.bin > RTOSDemo.hex
       ```
    ---
 
 ## **Running FreeRTOS on RISC-V Core**
 
-Once the binary is generated, follow these steps to run the project:
+Once the binary is generated, follow these steps to run the project on UETRV-Pcore:
 
-
- **Copy** the `hello.hex` file to the required directory:
-   ```bash
-   cp hello.hex /path/to/uetrvpcore/sdk/example-uart/src/
-   ```
+**Copy** the contents of `Demo/build/RTOSDemo.hex` to the required directory as `hello.hex`:
+```bash
+cp Demo/build/RTOSDemo.hex UETRV-Pcore/sdk/example-uart/build/hello.hex
+```
 
 ---
 
@@ -129,16 +130,18 @@ To simulate the project, you need to run the simulation tools:
 
 1. **Run the simulation with UART**:
    ```bash
+   cd UETRV-Pcore
    sim-verilate uart
    ```
 
 2. **Enable VCD generation**:
-   To generate a VCD (Value Change Dump) file for waveform analysis, use the following command:
+   To generate a VCD file for waveform analysis, use the following command:
    ```bash
    sim-verilate uart vcd=1
    ```
-
-3. **Cycle Count Configuration**:
+   The output will be generated as `trace.vcd` file in main folder.
+   
+4. **Cycle Count Configuration**:
    If you wish to modify the number of cycles during simulation, edit the `Makefile` or pass the desired value with the `max_cycles` flag:
    ```bash
    make max_cycles=<desired_number_of_cycles>
@@ -148,10 +151,11 @@ To simulate the project, you need to run the simulation tools:
 
 ## **Viewing the Output**
 
-After running the simulation, the output will be available in the `uartlog` file. You can check the content of this log file to see the required UART output.
+After running the simulation, the output will be available in the `uartlog` file in the same folder. You can check the content of this log file to see the required UART output.
 
 For a successful demo, you should expect output similar to the following in the `uartlog`:
 
+---
 
 ## **Notes for Modifications**
 
