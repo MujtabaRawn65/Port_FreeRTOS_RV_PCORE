@@ -115,7 +115,7 @@ Follow the steps below to build the **GNU RISC-V Toolchain** using Crosstool-NG:
 
 ## **Running FreeRTOS Demo on RISC-V Core**
 
-Once the binary is generated, follow these steps to run the project on UETRV-Pcore:
+Once the hex file is generated, follow these steps to run the project on UETRV-Pcore:
 
 **Copy** the contents of `Demo/build/RTOSDemo.hex` to the required directory as `hello.hex`:
 ```bash
