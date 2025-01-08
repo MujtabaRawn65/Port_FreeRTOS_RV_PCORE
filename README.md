@@ -92,19 +92,15 @@ Follow the steps below to build the **GNU RISC-V Toolchain** using Crosstool-NG:
 2. **Build the project using `make`**:
    Simply run:
    ```bash
+   cd Demo/
    make
    ```
-
-   If you want to build in debug mode, pass `DEBUG=1`. For an RV64 build, use `XLEN=64`:
-   ```bash
-   make DEBUG=1
-   make XLEN=64
-   ```
+   
    The resulting executable file will be located at `./build/RTOSDemo.axf`.
    
-3. **Converting `.afx` to `.hex`**:
+3. **Converting `.axf` to `.hex`**:
 
-    After building the project, you can convert the `.afx` binary file to a `.hex` file for further use:
+    After building the project, you can convert the `.axf` binary file to a `.hex` file for further use:
    
       ```bash
       riscv32-unknown-elf-objcopy -O binary RTOSDemo.axf RTOSDemo.bin
@@ -112,13 +108,13 @@ Follow the steps below to build the **GNU RISC-V Toolchain** using Crosstool-NG:
       ```
    ---
 
-## **Running FreeRTOS Demo on RISC-V Core**
+## **Running FreeRTOS Demo on UETRV_PCore**
 
-Once the hex file is generated, follow these steps to run the project on UETRV-Pcore:
+Once the hex file is generated, follow these steps to run the project on UETRV_PCore:
 
-**Copy** the contents of `Demo/build/RTOSDemo.hex` to the required directory as `hello.hex`:
+Simply go to `UETRV-PCore` directory and run:
 ```bash
-cp Demo/build/RTOSDemo.hex UETRV-Pcore/sdk/example-uart/build/hello.hex
+make run-freerots
 ```
 
 ---
@@ -130,13 +126,13 @@ To simulate the project, you need to run the simulation tools:
 1. **Run the simulation with UART**:
    ```bash
    cd UETRV-Pcore
-   sim-verilate uart
+   make sim-verilate-uart
    ```
-
+    
 2. **Enable VCD generation**:
    To generate a VCD file for waveform analysis, use the following command:
    ```bash
-   sim-verilate uart vcd=1
+   make sim-verilate-uart vcd=1
    ```
    The output will be generated as `trace.vcd` file in main folder.
    
@@ -150,18 +146,72 @@ To simulate the project, you need to run the simulation tools:
 
 ## **Viewing the Output**
 
-After running the simulation, the output will be available in the `uartlog` file in the same folder. You can check the content of this log file to see the required UART output.
+After running the simulation, the output will be available in the `uart_logdata.log` file in the same folder. You can check the content of this log file to see the required UART output.
 
-For a successful demo, you should expect output similar to the following in the `uartlog`:
+For a successful demo, you should expect output similar to the following in the `uart_logdata.log   `:
 
 <p align="center">
   <img src="output/out.png" alt="Log file Output" width="600"/>
 </p>
 ---
 
+## **Currently Running Tasks**
+
+The **Port_FreeRTOS_RV_PCORE** project includes the following tasks, each demonstrating different FreeRTOS functionalities:
+
+| **Task Name**           | **Functionality**                                          | **Priority**                           | **Frequency**               |
+|-------------------------|------------------------------------------------------------|----------------------------------------|-----------------------------|
+| `prvQueueSendTask`      | Sends incrementing values to the queue                     | `mainQUEUE_SEND_TASK_PRIORITY` (2)     | Every **1 second**          |
+| `prvQueueReceiveTask`   | Receives and logs values from the queue                    | `mainQUEUE_RECEIVE_TASK_PRIORITY` (3)  | Continuously upon send      |
+| `prvPrintHelloTask`     | Prints "Hello FreeRTOS!" message                           | `mainPRINT_HELLO_TASK_PRIORITY` (1)    | Every **5 seconds**         |
+| `prvTimerTask`          | Acts as a timer, increments a counter, and logs it          | `mainTIMER_TASK_PRIORITY` (4)          | Every **2 seconds**         |
+| `prvTimeSlicingTask`    | Demonstrates time slicing by yielding and logging           | `mainTIME_SLICING_TASK_PRIORITY` (4)   | Every **2 seconds**         |
+
+---
+
+## **Adding More Tasks in FreeRTOS**
+
+Expanding your FreeRTOS application by adding additional tasks is straightforward. Follow the steps below to integrate new tasks into your project effectively.
+
+### **Step 1: Define Task Priority and Frequency**
+
+Define macros to set the task's priority and execution frequency. This promotes consistency and ease of configuration across your application.
+
+```c
+#define mainNAME_TASK_PRIORITY       ( tskIDLE_PRIORITY + 2 )
+#define mainNAME_TASK_FREQUENCY_MS   pdMS_TO_TICKS( 3000 ) // 3 seconds
+```
+
+### **Step 2: Define the Task Function**
+
+Each task requires a function that implements its behavior. The function must adhere to the FreeRTOS task function prototype:
+
+```c
+static void prvNewTask( void * pvParameters )
+{
+    ( void ) pvParameters; // To avoid compiler warnings if not used
+
+    for( ; ; ) // Infinite Loop (Task Never E
+    {
+        // Task-specific operations go here
+
+        // Typically includes delays to manage execution frequency
+    }
+}
+```
+### **Step 3: Create the New Task**
+
+Use the `xTaskCreate` function to add the new task to the FreeRTOS scheduler. This function requires several parameters, including the task function, name, stack size, parameters, priority, and task handle.
+
+```c
+xTaskCreate( prvNewTask, "New-Task", configMINIMAL_STACK_SIZE * 2U, NULL,
+             mainNAME_TASK_PRIORITY, NULL );
+```
+You should add this line in the `main_blinky` function to successfully create the new task.
+
 ## **Notes for Modifications**
 
-- To change the behavior of the tasks (such as altering the FreeRTOS tasks or their interactions), modify the `main.c` or `blinky.c` file.
-- After making changes, rebuild the project using the `make` command to regenerate the `.afx` file.
+- To change the behavior of the tasks (such as altering the FreeRTOS tasks or their interactions), modify the `main_blinky.c` file.
+- After making changes, rebuild the project using the `make` command to regenerate the `.axf` file.
 
 
