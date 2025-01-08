@@ -1,217 +1,129 @@
-# **Port_FreeRTOS_RV_PCORE**
+# UETRV_Pcore
+[![pcore-riscof](https://github.com/ee-uet/UETRV-PCore/actions/workflows/main.yml/badge.svg)](https://github.com/ee-uet/UETRV-PCore/actions/workflows/main.yml)
+[![Documentation status](https://img.shields.io/badge/Docs-Passing-brightgreen)](https://uetrv-pcore-doc.readthedocs.io/en/main/index.html)
 
-## **Objective**
+UETRV_Pcore is a RISC-V based application class SoC integrating a 5-stage pipelined processor with memory and peripherals. Currently, the core implements RV32IMACZicsr ISA based on User-level ISA Version 2.0 and Privileged Architecture Version 1.11 supporting M/S/U modes. Following are the key features of the SoC:
 
-The Port_FreeRTOS_RV_PCORE project is designed to set up and run the FreeRTOS operating system on RISC-V cores, specifically demonstrated on the UET RV PCORE platform. The project showcases the capability of FreeRTOS in managing real-time tasks on RISC-V architecture, highlighting the efficiency of the system through a simple UART communication example.
+## Key Features
+- 32-bit RISC-V ISA core that supports base integer (I) and multiplication and division (M), atomic (A), compressed (C) and Zicsr (Z) extensions (RV32IMACZicsr).
+- Supports user, supervisor and machine mode privilege levels.
+- Support for instruction / data (writeback) caches.
+- Sv32 based MMU support and is capable of running Linux.
+- 32 KB 4-way set associative instruction cache.
+- 32-KB direct mapped write-back data cache. 
+- Cache size, TLB entries etc., are configurable.
+- Intergated PLIC, CLINT, uart, spi peripherals. 
+- Uses RISOF framework to run architecture compatibility tests.
+- Coremark: **2.0 Coremark/MHz** with DDR2 based main memory.
+- LUTs for core (including MMU) < 4.5k and for the SoC (including cache controllers but excluding DDR controller) < 6k.
 
----
+### System Design Overview
+The UETRV_Pcore is an applicaion class processor capable of running Linux. A simplified 5-stage pipelined block diagram is shown below. The M-extension is implemented as a coprocessor while memory-management-unit (MMU) module is shared by instruction and data memory (alternatively called load-store-unit (LSU)) interfaces of the pipeline. Specifically, the page-table-walker (PTW) of the MMU is shared and there are separate TLBs (translation look aside buffers) for instruction and data memory interfaces. The A-extension is implemented as part of the LSU module.
 
-## **Prerequisites**
+![pipeline](./docs/images/pipeline.png)
 
-To build and run the project, ensure that you have the following tools and software installed:
+The SoC block diagram shows the connectivity of the core with memory sub-system as well as different peripherals using data bus. The boot memory is connected to both instruction and data buses of the core using a bus multiplexer. The instruction and data caches share the main memory using a bus arbiter. Different necessary peripherals are connected using the data bus. Further details related to the SoC design are available at <https://uetrv-pcore-doc.readthedocs.io/en/main/>.
 
-- **GNU RISC-V Toolchain** (tested on Crosstool-NG)
-- **Verilator**: A tool for compiling Verilog code into C++ models, used for simulation.
-  - To install Verilator, follow the instructions from [Verilator Installation Guide](https://verilator.org/).
-  
-- **GTKWave**: A waveform viewer used to visualize simulation outputs, such as VCD files.
-  - Install GTKWave with the following command (for Ubuntu-based systems):
-    
-    ```bash
-    sudo apt-get install gtkwave
-    ```
----
+![soc](./docs/images/soc.png)
 
-## **How to Build Toolchain**
+### SoC Memory Map
+The memory map for the SOC is provided in the following table.
+| Base Address        |    Description            |   Attributes    |
+|:-------------------:|:-------------------------:|:---------------:|
+| 0x8000_0000         |      Memory               |      R-X-W      |
+| 0x9000_0000         |      UART                 |      R-W        |
+| 0x9400_0000         |      PLIC                 |      R-W        |
+| 0x9C00_0000         |      SPI                  |      R-W        |
+| 0x0200_0000         |      CLINT                |      R-W        |
+| 0x0000_1000         |      Boot Memory          |      R-X        |
 
-Follow the steps below to build the **GNU RISC-V Toolchain** using Crosstool-NG:
+- `R: Read access`
+- `W: Write access`
+- `X: Execute access`
 
-1. **Clone the Crosstool-NG repository**:
-   ```bash
-   git clone https://github.com/crosstool-ng/crosstool-ng
-   cd crosstool-ng
-   ```
 
-2. **Bootstrap and configure Crosstool-NG**:
-   ```bash
-   ./bootstrap
-   ./configure --enable-local
-   make
-   ```
+## Getting Started
 
-3. **Generate Toolchain Configuration**:
-   Create a `defconfig` file (exactly the same name, with no file extension) with the following content based on your build architecture:
+Install RISC-V [toolchain](https://github.com/riscv-collab/riscv-gnu-toolchain) and [verilator](https://verilator.org/guide/latest/install.html). These tools can be built by following the instructions in the corresponding links, or can be installed directly by running the following command
 
-   **For RV32 builds**:
-   ```text
-   CT_EXPERIMENTAL=y
-   CT_ARCH_RISCV=y
-   CT_ARCH_64=n
-   CT_ARCH_ARCH="rv32ima"
-   CT_ARCH_ABI="ilp32"
-   CT_TARGET_CFLAGS="-mcmodel=medany"
-   CT_TARGET_LDFLAGS="-mcmodel=medany"
-   CT_MULTILIB=y
-   CT_DEBUG_GDB=y
-   ```
+    sudo apt-get install -y gcc-riscv64-unknown-elf verilator gtkwave
 
-   **For RV64 builds**:
-   ```text
-   CT_EXPERIMENTAL=y
-   CT_ARCH_RISCV=y
-   CT_ARCH_64=y
-   CT_ARCH_ARCH="rv64ima"
-   CT_ARCH_ABI="lp64"
-   CT_TARGET_CFLAGS="-mcmodel=medany"
-   CT_TARGET_LDFLAGS="-mcmodel=medany"
-   CT_MULTILIB=y
-   CT_DEBUG_GDB=y
-   ```
+Check that these tools are installed correctly, by running `verilator --version` and `riscv64-unknown-elf-gcc -v`.
 
-4. **Run the command to save configurations**:
-   ```bash
-   ./ct-ng defconfig
-   ```
+### Build Model and Run Simulation
 
-5. **Build the GNU Toolchain**:
-   ```bash
-   ./ct-ng build
-   ```
+Verilator model of Pcore can be built using Makefile:
 
-   This will install the toolchain to `~/x-tools/riscv32-unknown-elf` or `~/x-tools/riscv64-unknown-elf` depending on your build.
+    make verilate
 
----
+The verilator model is build under `ver_work/Vpcore_sim`. The executeable can accept the following three parameters:
 
-## **Building the Project**
+- `imem`: This paramerter accepts the file that contain the hexadecimal instructions of compiled program.
+- `max_cycles`: This parameter cotrols the maxiumum number of cycles for simulation. Simulation terminates after executing these many cycles.
+- `vcd`: This parameters accepts a boolean value. If it is 0, the waveform file `trace.vcd` will not be dumped and vice versa.
 
-1. **Add the path to your RISC-V toolchain**:
-   ```bash
-   export PATH=~/x-tools/{YOUR_TOOLCHAIN}/bin:$PATH
-   ```
+An example program to print `HELLO` on terminal via UART is compiled and its hex instructions are availabe in [here](/sdk/example-uart/hello.hex). Run the following command to simulate the example program
 
-2. **Build the project using `make`**:
-   Simply run:
-   ```bash
-   cd Demo/
-   make
-   ```
-   
-   The resulting executable file will be located at `./build/RTOSDemo.axf`.
-   
-3. **Converting `.axf` to `.hex`**:
+    make sim-verilate-uart 
 
-    After building the project, you can convert the `.axf` binary file to a `.hex` file for further use:
-   
-      ```bash
-      riscv32-unknown-elf-objcopy -O binary RTOSDemo.axf RTOSDemo.bin
-      hexdump -ve '1/4 "%08x\n"' RTOSDemo.bin > RTOSDemo.hex
-      ```
-   ---
+This will simulate `hello.hex` and dump UART logs in `uart_logdata.log` file. If `vcd=1` is added to the above command, `trace.vcd` will be created that can be viewed by running
 
-## **Running FreeRTOS Demo on UETRV_PCore**
+    gtkwave trace.vcd
 
-Once the hex file is generated, follow these steps to run the project on UETRV_PCore:
+The `imem` and `max_cycles` may be overwritten in Makefile using.
 
-Simply go to `UETRV-PCore` directory and run:
+    make sim-verilate-uart imem=</path/to/hex/file> max_cycles=<No. of cycles> 
+
+### Verification
+
+UETRV_Pcore uses RISOF framework to run Architecture Compatibility Tests (ACTs). Instructions to run these tests can be followed in [verif](/verif/) directory.
+
+## Booting Linux
+
+Using the same procedure as outlined above, we can simulate the Linux bootup using a prebuilt image (`imem.zip`) available in `./sdk/example-linux/` folder. The pre-built Linux image is prepared using `initramfs` based root file system (`rootfs`) and is directly linked into the kernel. Furthermore, the Linux/kernel image is linked as a `payload` to the `OpenSBI` that acts as a first-level bootloader. The `imem.zip` image contains:
+
+- Root file system (`rootfs.cpio`) based on `initramfs` using Busybox 1.33
+- The Linux (version 6.1.0) with rootfs.cpio linked into the kernel
+- OpenSBI (ver. 0.9) based first order bootloader with Linux kernel as payload
+
+During booting process, the processor starts executing zero-level bootloader from `bmem` and then jumps to first-level bootloader (OpenSBI), which after necessary initializations, hands the control over to the kernel.
+
+### Booting with Verilator
+For Verilator based simulation one configurtion is required. Open the file `rtl/defines/pcore_config_defs.svh` and uncomment the line \` `define RTL_SIMULATION 1`. Now run the following command to extract the `imem.txt` to `./sdk/example-linux/` and simulate the Linux booting process using this pre-built image. 
+
+    make sim-verilate-linux
+
+The output is logged to the `uart_logdata.log` file (a copy of this log is available in `./sdk/`). 
+
+### Booting on FPGA Board 
+The processor is tested using Nexys-A7 (100T) FPGA board and Vivado 2019. Type in the following command to open the project in Vivado 2019
+```
+vivado PCore_FPGA/PCore_FPGA.xpr
+```
+Make sure that \` `define RTL_SIMULATION 1` is commented out, while \` `define DRAM 1` is uncommented in the file `rtl/defines/pcore_config_defs.svh`. The instruction and data cache sizes can also be configured here. 
+
+### Generate bitstream
+New bitstream can be generated with the exisitng project or you may use the prebuilt bitstream available in the folder ``FPGA_Target/Bit_stream``
+
+### Booting Linux Image
+* Load the bitstream on the FPGA, your serial monitor will show message `Load File`
+* Type in the following commands to load the prebuilt Linux image
+  ```
+  cd sdk/load_image
+  python3 serial_sendfile.py <baud_rate in MHz> <path/to/image/file>
+  ```
+* Baud rate of existing bitstream is ``4000000``. Sample Linux image is saved in ``sdk/load_image`` folder.
+* If using default baud rate and default bitstream, the following command can be run
+  ```
+  python3 serial_sendfile.py 4 imem.bin
+  ```
+After successful downloading of the image the booting process starts. A snapshot of the boot log is shown below. 
+
+![bootlog](./docs/images/linux_boot_log.png)
+
+## FreeRTOS Demo
+To run the `FreeRTOS` on the `UETRV-PCore` then simply run:
 ```bash
-make run-freerots
+make run-freertos
 ```
-
----
-
-## **Running the Simulation**
-
-To simulate the project, you need to run the simulation tools:
-
-1. **Run the simulation with UART**:
-   ```bash
-   cd UETRV-Pcore
-   make sim-verilate-uart
-   ```
-    
-2. **Enable VCD generation**:
-   To generate a VCD file for waveform analysis, use the following command:
-   ```bash
-   make sim-verilate-uart vcd=1
-   ```
-   The output will be generated as `trace.vcd` file in main folder.
-   
-4. **Cycle Count Configuration**:
-   If you wish to modify the number of cycles during simulation, edit the `Makefile` or pass the desired value with the `max_cycles` flag:
-   ```bash
-   make max_cycles=<desired_number_of_cycles>
-   ```
-
----
-
-## **Viewing the Output**
-
-After running the simulation, the output will be available in the `uart_logdata.log` file in the same folder. You can check the content of this log file to see the required UART output.
-
-For a successful demo, you should expect output similar to the following in the `uart_logdata.log   `:
-
-<p align="center">
-  <img src="output/out.png" alt="Log file Output" width="600"/>
-</p>
----
-
-## **Currently Running Tasks**
-
-The **Port_FreeRTOS_RV_PCORE** project includes the following tasks, each demonstrating different FreeRTOS functionalities:
-
-| **Task Name**           | **Functionality**                                          | **Priority**                           | **Frequency**               |
-|-------------------------|------------------------------------------------------------|----------------------------------------|-----------------------------|
-| `prvQueueSendTask`      | Sends incrementing values to the queue                     | `mainQUEUE_SEND_TASK_PRIORITY` (2)     | Every **1 second**          |
-| `prvQueueReceiveTask`   | Receives and logs values from the queue                    | `mainQUEUE_RECEIVE_TASK_PRIORITY` (3)  | Continuously upon send      |
-| `prvPrintHelloTask`     | Prints "Hello FreeRTOS!" message                           | `mainPRINT_HELLO_TASK_PRIORITY` (1)    | Every **5 seconds**         |
-| `prvTimerTask`          | Acts as a timer, increments a counter, and logs it          | `mainTIMER_TASK_PRIORITY` (4)          | Every **2 seconds**         |
-| `prvTimeSlicingTask`    | Demonstrates time slicing by yielding and logging           | `mainTIME_SLICING_TASK_PRIORITY` (4)   | Every **2 seconds**         |
-
----
-
-## **Adding More Tasks in FreeRTOS**
-
-Expanding your FreeRTOS application by adding additional tasks is straightforward. Follow the steps below to integrate new tasks into your project effectively.
-
-### **Step 1: Define Task Priority and Frequency**
-
-Define macros to set the task's priority and execution frequency. This promotes consistency and ease of configuration across your application.
-
-```c
-#define mainNAME_TASK_PRIORITY       ( tskIDLE_PRIORITY + 2 )
-#define mainNAME_TASK_FREQUENCY_MS   pdMS_TO_TICKS( 3000 ) // 3 seconds
-```
-
-### **Step 2: Define the Task Function**
-
-Each task requires a function that implements its behavior. The function must adhere to the FreeRTOS task function prototype:
-
-```c
-static void prvNewTask( void * pvParameters )
-{
-    ( void ) pvParameters; // To avoid compiler warnings if not used
-
-    for( ; ; ) // Infinite Loop (Task Never E
-    {
-        // Task-specific operations go here
-
-        // Typically includes delays to manage execution frequency
-    }
-}
-```
-### **Step 3: Create the New Task**
-
-Use the `xTaskCreate` function to add the new task to the FreeRTOS scheduler. This function requires several parameters, including the task function, name, stack size, parameters, priority, and task handle.
-
-```c
-xTaskCreate( prvNewTask, "New-Task", configMINIMAL_STACK_SIZE * 2U, NULL,
-             mainNAME_TASK_PRIORITY, NULL );
-```
-You should add this line in the `main_blinky` function to successfully create the new task.
-
-## **Notes for Modifications**
-
-- To change the behavior of the tasks (such as altering the FreeRTOS tasks or their interactions), modify the `main_blinky.c` file.
-- After making changes, rebuild the project using the `make` command to regenerate the `.axf` file.
-
 
